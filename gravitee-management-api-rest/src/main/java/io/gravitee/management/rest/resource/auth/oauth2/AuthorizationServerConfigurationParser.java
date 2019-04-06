@@ -62,6 +62,8 @@ public class AuthorizationServerConfigurationParser {
         userMapping.setLastname((String)EnvironmentUtils.get("mapping.lastname", configuration));
         userMapping.setFirstname((String)EnvironmentUtils.get("mapping.firstname", configuration));
         userMapping.setPicture((String)EnvironmentUtils.get("mapping.picture", configuration));
+        Boolean emailRequired = (Boolean) EnvironmentUtils.get("mapping.emailRequired", configuration);
+        userMapping.setEmailRequired(emailRequired == null || emailRequired);
 
         return userMapping;
     }

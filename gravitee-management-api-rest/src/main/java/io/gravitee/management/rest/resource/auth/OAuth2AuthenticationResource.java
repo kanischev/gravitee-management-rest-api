@@ -196,12 +196,20 @@ public class OAuth2AuthenticationResource extends AbstractAuthenticationResource
 
         String username = attrs.get(UserProfile.EMAIL);
         if (username == null) {
-            throw new BadRequestException("No public email linked to your account");
+            boolean emailIsRequired = serverConfiguration.getUserMapping().isEmailRequired();
+            if (emailIsRequired) {
+                throw new BadRequestException("No public email linked to your account");
+            } else {
+                username = attrs.get(UserProfile.ID);
+                if (username == null) {
+                    throw new BadRequestException("No public email nor ID linked to your account");
+                }
+            }
         }
 
         //set user to Authentication Context
         UserDetails userDetails = new UserDetails(username, "", Collections.emptyList());
-        userDetails.setEmail(username);
+        userDetails.setEmail(attrs.get(UserProfile.EMAIL));
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities()));
 
         try {

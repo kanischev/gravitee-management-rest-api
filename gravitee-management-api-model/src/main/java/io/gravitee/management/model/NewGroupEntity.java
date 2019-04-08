@@ -38,6 +38,8 @@ public class NewGroupEntity {
     private boolean systemInvitation;
     @JsonProperty("email_invitation")
     private boolean emailInvitation;
+    @JsonProperty("allowed_sharding_tags")
+    private List<String> allowedShardingTags;
 
     public String getName() {
         return name;
@@ -95,6 +97,14 @@ public class NewGroupEntity {
         this.emailInvitation = emailInvitation;
     }
 
+    public List<String> getAllowedShardingTags() {
+        return allowedShardingTags;
+    }
+
+    public void setAllowedShardingTags(List<String> allowedShardingTags) {
+        this.allowedShardingTags = allowedShardingTags;
+    }
+
     @Override
     public String toString() {
         return "NewGroupEntity{" +
@@ -105,6 +115,7 @@ public class NewGroupEntity {
                 ", lockApplicationRole=" + lockApplicationRole +
                 ", systemInvitation=" + systemInvitation +
                 ", emailInvitation=" + emailInvitation +
+                ", allowedShardingTags=" + allowedShardingTags +
                 '}';
     }
 }

@@ -31,12 +31,16 @@ import io.gravitee.repository.management.model.Api;
 import io.gravitee.repository.management.model.Membership;
 import io.gravitee.repository.management.model.MembershipReferenceType;
 import io.gravitee.repository.management.model.RoleScope;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.io.IOException;
 import java.net.URL;
@@ -95,6 +99,13 @@ public class ApiService_UpdateWithDefinitionTest {
 
     @Mock
     private SearchEngineService searchEngineService;
+
+    @Before
+    public void init() {
+        final SecurityContext securityContext = mock(SecurityContext.class);
+        when(securityContext.getAuthentication()).thenReturn(mock(Authentication.class));
+        SecurityContextHolder.setContext(securityContext);
+    }
 
     @Test
     public void shouldUpdateImportApiWithMembersAndPages() throws IOException, TechnicalException {

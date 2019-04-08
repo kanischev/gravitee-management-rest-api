@@ -16,11 +16,13 @@
 package io.gravitee.management.service.impl;
 
 import io.gravitee.common.utils.IdGenerator;
+import io.gravitee.management.model.GroupEntity;
 import io.gravitee.management.model.NewTagEntity;
 import io.gravitee.management.model.TagEntity;
 import io.gravitee.management.model.UpdateTagEntity;
 import io.gravitee.management.service.ApiService;
 import io.gravitee.management.service.AuditService;
+import io.gravitee.management.service.GroupService;
 import io.gravitee.management.service.TagService;
 import io.gravitee.management.service.exceptions.DuplicateTagNameException;
 import io.gravitee.management.service.exceptions.TechnicalManagementException;
@@ -33,36 +35,37 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static io.gravitee.repository.management.model.Audit.AuditProperties.TAG;
 import static io.gravitee.repository.management.model.Tag.AuditEvent.*;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 
 /**
  * @author Azize ELAMRANI (azize at graviteesource.com)
  * @author GraviteeSource Team
  */
 @Component
-public class TagServiceImpl extends TransactionalService implements TagService {
+public class TagServiceImpl extends AbstractService implements TagService {
 
     private final Logger LOGGER = LoggerFactory.getLogger(TagServiceImpl.class);
 
     @Autowired
     private TagRepository tagRepository;
-
     @Autowired
     private ApiService apiService;
-
     @Autowired
     private AuditService auditService;
+    @Autowired
+    private GroupService groupService;
 
     @Override
     public List<TagEntity> findAll() {
         try {
-            LOGGER.debug("Find all APIs");
+            LOGGER.debug("Find all tags");
             return tagRepository.findAll()
                     .stream()
-                    .map(this::convert).collect(Collectors.toList());
+                    .map(this::convert).collect(toList());
         } catch (TechnicalException ex) {
             LOGGER.error("An error occurs while trying to find all tags", ex);
             throw new TechnicalManagementException("An error occurs while trying to find all tags", ex);
@@ -74,7 +77,7 @@ public class TagServiceImpl extends TransactionalService implements TagService {
         // First we prevent the duplicate tag name
         final List<String> tagNames = tagEntities.stream()
                 .map(NewTagEntity::getName)
-                .collect(Collectors.toList());
+                .collect(toList());
 
         final Optional<TagEntity> optionalTag = findAll().stream()
                 .filter(tag -> tagNames.contains(tag.getName()))
@@ -145,6 +148,30 @@ public class TagServiceImpl extends TransactionalService implements TagService {
         } catch (TechnicalException ex) {
             LOGGER.error("An error occurs while trying to delete tag {}", tagId, ex);
             throw new TechnicalManagementException("An error occurs while trying to delete tag " + tagId, ex);
+        }
+    }
+
+    @Override
+    public Set<String> findByUser(final String user) {
+        final Set<String> tags = findAll().stream()
+            .map(TagEntity::getName)
+            .collect(toSet());
+        if (isAdmin()) {
+            return tags;
+        } else {
+            final Set<String> restrictedTags = groupService.findAll().stream()
+                    .flatMap(group -> group.getAllowedShardingTags().stream())
+                    .collect(toSet());
+
+            final Set<String> allowedTags = tags.stream()
+                    .filter(tag -> !restrictedTags.contains(tag))
+                    .collect(toSet());
+
+            final Set<GroupEntity> groups = groupService.findByUser(user);
+            allowedTags.addAll(groups.stream()
+                    .flatMap(group -> group.getAllowedShardingTags().stream())
+                    .collect(toList()));
+            return allowedTags;
         }
     }
 

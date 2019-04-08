@@ -19,11 +19,16 @@ import com.auth0.jwt.JWTVerifier;
 import io.gravitee.common.http.HttpHeaders;
 import io.gravitee.common.http.HttpStatusCode;
 import io.gravitee.management.idp.api.authentication.UserDetails;
+import io.gravitee.management.model.RoleEntity;
 import io.gravitee.management.security.cookies.JWTCookieGenerator;
+import io.gravitee.management.service.MembershipService;
 import io.gravitee.management.service.common.JWTHelper.Claims;
+import io.gravitee.repository.management.model.MembershipReferenceType;
+import io.gravitee.repository.management.model.RoleScope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.GenericFilterBean;
@@ -39,9 +44,13 @@ import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static io.gravitee.repository.management.model.MembershipReferenceType.PORTAL;
 import static java.net.URLDecoder.decode;
 import static java.nio.charset.Charset.defaultCharset;
+import static java.util.Collections.singleton;
+import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.lang3.StringUtils.isEmpty;
+import static org.springframework.security.core.authority.AuthorityUtils.commaSeparatedStringToAuthorityList;
 
 /**
  * @author Azize Elamrani (azize at gravitee.io)
@@ -53,10 +62,12 @@ public class JWTAuthenticationFilter extends GenericFilterBean {
 
     private final JWTVerifier jwtVerifier;
     private JWTCookieGenerator jwtCookieGenerator;
+    private MembershipService membershipService;
 
-    public JWTAuthenticationFilter(final String jwtSecret, final JWTCookieGenerator jwtCookieGenerator) {
+    public JWTAuthenticationFilter(final String jwtSecret, final JWTCookieGenerator jwtCookieGenerator, final MembershipService membershipService) {
         this.jwtVerifier = new JWTVerifier(jwtSecret);
         this.jwtCookieGenerator = jwtCookieGenerator;
+        this.membershipService = membershipService;
     }
 
     @Override
@@ -88,18 +99,25 @@ public class JWTAuthenticationFilter extends GenericFilterBean {
                     final Map<String, Object> verify = jwtVerifier.verify(jwtToken);
 
                     List<Map> permissions = (List<Map>) verify.get(Claims.PERMISSIONS);
-                    List<SimpleGrantedAuthority> authorities;
+                    final Set<GrantedAuthority> authorities = new HashSet<>();
 
-                    if (permissions != null) {
-                        authorities = ((List<Map>) verify.get(Claims.PERMISSIONS)).stream()
+                    if (permissions != null && !permissions.isEmpty()) {
+                        authorities.addAll(((Set<Map>) verify.get(Claims.PERMISSIONS)).stream()
                                 .map(map -> new SimpleGrantedAuthority(map.get("authority").toString()))
-                                .collect(Collectors.toList());
-                    } else {
-                        authorities = Collections.emptyList();
+                                .collect(toSet()));
                     }
 
-                    final UserDetails userDetails = new UserDetails(getStringValue(verify.get(Claims.SUBJECT)), "",
-                            authorities);
+                    final String userId = getStringValue(verify.get(Claims.SUBJECT));
+                    final Set<RoleEntity> roles =
+                            membershipService.getRoles(PORTAL, singleton("DEFAULT"), userId, RoleScope.PORTAL);
+                    roles.addAll(membershipService.getRoles(MembershipReferenceType.MANAGEMENT, singleton("DEFAULT"), userId, RoleScope.MANAGEMENT));
+
+                    if (!roles.isEmpty()) {
+                        authorities.addAll(commaSeparatedStringToAuthorityList(roles.stream()
+                                .map(r -> r.getScope().name() + ':' + r.getName()).collect(Collectors.joining(","))));
+                    }
+
+                    final UserDetails userDetails = new UserDetails(userId, "", authorities);
                     userDetails.setEmail((String) verify.get(Claims.EMAIL));
                     userDetails.setFirstname((String) verify.get(Claims.FIRSTNAME));
                     userDetails.setLastname((String) verify.get(Claims.LASTNAME));

@@ -22,6 +22,7 @@ import io.gravitee.management.security.authentication.AuthenticationProviderMana
 import io.gravitee.management.security.cookies.JWTCookieGenerator;
 import io.gravitee.management.security.filter.JWTAuthenticationFilter;
 import io.gravitee.management.security.listener.AuthenticationSuccessListener;
+import io.gravitee.management.service.MembershipService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,6 +71,8 @@ public class BasicSecurityConfigurerAdapter extends WebSecurityConfigurerAdapter
     private AuthenticationProviderManager authenticationProviderManager;
     @Autowired
     private JWTCookieGenerator jwtCookieGenerator;
+    @Autowired
+    private MembershipService membershipService;
 
     @Override
     protected void configure(AuthenticationManagerBuilder auth) throws Exception {
@@ -170,7 +173,7 @@ public class BasicSecurityConfigurerAdapter extends WebSecurityConfigurerAdapter
         cors(http);
 
         http
-                .addFilterBefore(new JWTAuthenticationFilter(jwtSecret, jwtCookieGenerator), BasicAuthenticationFilter.class);
+                .addFilterBefore(new JWTAuthenticationFilter(jwtSecret, jwtCookieGenerator, membershipService), BasicAuthenticationFilter.class);
     }
 
     private HttpSecurity authentication(HttpSecurity security) throws Exception {
